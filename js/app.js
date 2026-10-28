@@ -5,6 +5,8 @@
     Health: "🌿", Shopping: "🛍️", Entertainment: "🎟️", Salary: "💼", Other: "✦"
   };
   const monthPicker = document.getElementById("month-picker");
+  const themeToggle = document.getElementById("theme-toggle");
+  const themeToggleLabel = document.getElementById("theme-toggle-label");
   const dateInput = document.getElementById("date");
   const form = document.getElementById("transaction-form");
   const typeInput = document.getElementById("type");
@@ -31,6 +33,26 @@
   let toastTimer;
   monthPicker.value = localDate.slice(0, 7);
   dateInput.value = localDate;
+
+  function applyTheme(theme) {
+    const isDark = theme === "dark";
+    document.documentElement.dataset.theme = isDark ? "dark" : "light";
+    themeToggle.setAttribute("aria-pressed", String(isDark));
+    themeToggle.setAttribute("aria-label", `Switch to ${isDark ? "light" : "night"} mode`);
+    themeToggleLabel.textContent = isDark ? "Light mode" : "Night mode";
+    document.querySelector('meta[name="theme-color"]').content = isDark ? "#151b17" : "#f5f6f2";
+  }
+
+  function toggleTheme() {
+    const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    applyTheme(theme);
+    try {
+      localStorage.setItem("daybook-theme", theme);
+    } catch (error) {
+      console.error("Could not save the theme preference.", error);
+      showToast("Theme changed, but the preference couldn't be saved.");
+    }
+  }
 
   function showToast(message) {
     const toast = document.getElementById("toast");
@@ -488,7 +510,14 @@
   disconnectCsvButton.addEventListener("click", disconnectCsv);
   budgetForm.addEventListener("submit", saveBudget);
   monthPicker.addEventListener("change", openMonth);
+  themeToggle.addEventListener("click", toggleTheme);
 
+  try {
+    applyTheme(localStorage.getItem("daybook-theme") === "dark" ? "dark" : "light");
+  } catch (error) {
+    console.error("Could not read the theme preference.", error);
+    applyTheme("light");
+  }
   updateTransactionForm();
   render();
   initialize();
