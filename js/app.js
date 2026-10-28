@@ -14,7 +14,9 @@
   const budgetForm = document.getElementById("budget-form");
   const list = document.getElementById("transaction-list");
   const recurringForm = document.getElementById("recurring-form");
+  const recurringIncomeForm = document.getElementById("recurring-income-form");
   const recurringList = document.getElementById("recurring-list");
+  const recurringIncomeList = document.getElementById("recurring-income-list");
   const storageStatus = document.getElementById("storage-status");
   const connectCsvButton = document.getElementById("connect-csv");
   const reconnectCsvButton = document.getElementById("reconnect-csv");
@@ -127,17 +129,17 @@
       : "Set a budget to track your spending.";
   }
 
-  function renderRecurringExpenses() {
-    recurringList.replaceChildren();
-    if (state.recurringExpenses.length === 0) {
+  function renderRecurringItems(container, items, emptyMessage, type) {
+    container.replaceChildren();
+    if (items.length === 0) {
       const empty = document.createElement("div");
       empty.className = "empty";
-      empty.textContent = "No monthly outgoings set up yet.";
-      recurringList.append(empty);
+      empty.textContent = emptyMessage;
+      container.append(empty);
       return;
     }
 
-    for (const recurring of state.recurringExpenses) {
+    for (const recurring of items) {
       const row = document.createElement("div");
       row.className = "recurring-item";
       const info = document.createElement("div");
@@ -152,16 +154,21 @@
 
       const amount = document.createElement("span");
       amount.className = "recurring-item-amount";
-      amount.textContent = `−${formatter.format(recurring.amount)}`;
+      amount.textContent = `${type === "income" ? "+" : "−"}${formatter.format(recurring.amount)}`;
       const stop = document.createElement("button");
       stop.className = "delete-button";
       stop.type = "button";
       stop.setAttribute("aria-label", `Stop recurring ${recurring.description}`);
       stop.textContent = "×";
-      stop.addEventListener("click", () => stopRecurringExpense(recurring));
+      stop.addEventListener("click", () => stopRecurring(recurring, type));
       row.append(info, amount, stop);
-      recurringList.append(row);
+      container.append(row);
     }
+  }
+
+  function renderRecurringLists() {
+    renderRecurringItems(recurringList, state.recurringExpenses, "No monthly outgoings set up yet.", "expense");
+    renderRecurringItems(recurringIncomeList, state.recurringIncomes, "No monthly income set up yet.", "income");
   }
 
   function render() {
@@ -183,7 +190,7 @@
       `${transactions.length} transaction${transactions.length === 1 ? "" : "s"}`;
     renderTransactions(transactions);
     renderBudget(expenses, budget);
-    renderRecurringExpenses();
+    renderRecurringLists();
   }
 
   async function saveCurrentState() {
@@ -206,7 +213,7 @@
 
   function chooseRecurringDeleteAction(transaction) {
     document.getElementById("recurring-delete-description").textContent =
-      `“${transaction.description}” is part of a monthly outgoing. Choose whether to keep it for future months.`;
+      `“${transaction.description}” is part of monthly ${transaction.type === "income" ? "income" : "outgoings"}. Choose whether to keep it for future months.`;
     return new Promise(resolve => {
       recurringDeleteDialog.addEventListener("close", () => resolve(recurringDeleteDialog.returnValue), { once: true });
       recurringDeleteDialog.showModal();
@@ -221,6 +228,7 @@
     const previousTransactions = state.transactions;
     const previousSkips = state.recurringSkips;
     const previousRecurringExpenses = state.recurringExpenses;
+    const previousRecurringIncomes = state.recurringIncomes;
     state.transactions = state.transactions.filter(item => item.id !== transaction.id);
     if (transaction.recurringId && deleteAction === "occurrence") {
       const month = transaction.date.slice(0, 7);
@@ -229,6 +237,7 @@
       if (!alreadySkipped) state.recurringSkips = [...state.recurringSkips, { recurringId: transaction.recurringId, month }];
     } else if (transaction.recurringId && deleteAction === "future") {
       state.recurringExpenses = state.recurringExpenses.filter(item => item.id !== transaction.recurringId);
+      state.recurringIncomes = state.recurringIncomes.filter(item => item.id !== transaction.recurringId);
       state.recurringSkips = state.recurringSkips.filter(item => item.recurringId !== transaction.recurringId);
     }
     if (await saveCurrentState()) render();
@@ -236,6 +245,7 @@
       state.transactions = previousTransactions;
       state.recurringSkips = previousSkips;
       state.recurringExpenses = previousRecurringExpenses;
+      state.recurringIncomes = previousRecurringIncomes;
     }
   }
 
@@ -251,8 +261,12 @@
     return `${month}-${String(Math.min(day, lastDay)).padStart(2, "0")}`;
   }
 
-  async function ensureRecurringExpenses(month) {
-    const toAdd = state.recurringExpenses.filter(recurring =>
+  async function ensureRecurringTransactions(month) {
+    const recurringItems = [
+      ...state.recurringExpenses.map(item => ({ ...item, type: "expense" })),
+      ...state.recurringIncomes.map(item => ({ ...item, type: "income" }))
+    ];
+    const toAdd = recurringItems.filter(recurring =>
       recurring.startMonth <= month &&
       !state.recurringSkips.some(item => item.recurringId === recurring.id && item.month === month) &&
       !state.transactions.some(item => item.recurringId === recurring.id && item.date.slice(0, 7) === month)
@@ -266,7 +280,7 @@
         id: createId(),
         description: recurring.description,
         amount: recurring.amount,
-        type: "expense",
+        type: recurring.type,
         category: recurring.category,
         date: occurrenceDate(month, recurring.day),
         recurringId: recurring.id
@@ -296,7 +310,7 @@
       startMonth: monthPicker.value
     };
     state.recurringExpenses.push(recurring);
-    if (!(await ensureRecurringExpenses(monthPicker.value))) {
+    if (!(await ensureRecurringTransactions(monthPicker.value))) {
       state.recurringExpenses = state.recurringExpenses.filter(item => item.id !== recurring.id);
       return;
     }
@@ -306,17 +320,54 @@
     showToast("Monthly outgoing added.");
   }
 
-  async function stopRecurringExpense(recurring) {
-    if (!window.confirm(`Stop adding “${recurring.description}” in future months? Existing expenses will remain.`)) return;
+  async function addRecurringIncome(event) {
+    event.preventDefault();
+    if (!recurringIncomeForm.reportValidity()) return;
+    const data = new FormData(recurringIncomeForm);
+    const amount = Number(data.get("amount"));
+    const day = Number(data.get("day"));
+    const description = String(data.get("description")).trim();
+    if (!description || !Number.isFinite(amount) || amount <= 0 ||
+        !Number.isInteger(day) || day < 1 || day > 31) return;
+
+    const recurring = {
+      id: createId(),
+      description,
+      amount: Math.round(amount * 100) / 100,
+      category: String(data.get("category")),
+      day,
+      startMonth: monthPicker.value
+    };
+    state.recurringIncomes.push(recurring);
+    if (!(await ensureRecurringTransactions(monthPicker.value))) {
+      state.recurringIncomes = state.recurringIncomes.filter(item => item.id !== recurring.id);
+      return;
+    }
+    recurringIncomeForm.reset();
+    document.getElementById("recurring-income-day").value = "1";
+    render();
+    showToast("Monthly income added.");
+  }
+
+  async function stopRecurring(recurring, type) {
+    const collection = type === "income" ? state.recurringIncomes : state.recurringExpenses;
+    const label = type === "income" ? "income" : "expenses";
+    if (!window.confirm(`Stop adding “${recurring.description}” in future months? Existing ${label} will remain.`)) return;
     const previousRecurringExpenses = state.recurringExpenses;
+    const previousRecurringIncomes = state.recurringIncomes;
     const previousRecurringSkips = state.recurringSkips;
-    state.recurringExpenses = state.recurringExpenses.filter(item => item.id !== recurring.id);
+    if (type === "income") {
+      state.recurringIncomes = collection.filter(item => item.id !== recurring.id);
+    } else {
+      state.recurringExpenses = collection.filter(item => item.id !== recurring.id);
+    }
     state.recurringSkips = state.recurringSkips.filter(item => item.recurringId !== recurring.id);
     if (await saveCurrentState()) {
       render();
-      showToast("Future monthly outgoings stopped.");
+      showToast(`Future monthly ${type === "income" ? "income" : "outgoings"} stopped.`);
     } else {
       state.recurringExpenses = previousRecurringExpenses;
+      state.recurringIncomes = previousRecurringIncomes;
       state.recurringSkips = previousRecurringSkips;
     }
   }
@@ -358,13 +409,14 @@
 
   function confirmDataReplacement(imported) {
     const hasCurrentData = state.transactions.length || Object.keys(state.budgets).length ||
-      state.recurringExpenses.length;
+      state.recurringExpenses.length || state.recurringIncomes.length;
     if (!hasCurrentData) return true;
     const transactionCount = imported.transactions.length;
     const budgetCount = Object.keys(imported.budgets).length;
     const recurringCount = imported.recurringExpenses.length;
+    const recurringIncomeCount = imported.recurringIncomes.length;
     return window.confirm(
-      `Replace your current data with this CSV? It contains ${transactionCount} transaction${transactionCount === 1 ? "" : "s"}, ${budgetCount} monthly budget${budgetCount === 1 ? "" : "s"}, and ${recurringCount} recurring outgoing${recurringCount === 1 ? "" : "s"}.`
+      `Replace your current data with this CSV? It contains ${transactionCount} transaction${transactionCount === 1 ? "" : "s"}, ${budgetCount} monthly budget${budgetCount === 1 ? "" : "s"}, ${recurringIncomeCount} recurring income item${recurringIncomeCount === 1 ? "" : "s"}, and ${recurringCount} recurring outgoing${recurringCount === 1 ? "" : "s"}.`
     );
   }
 
@@ -432,13 +484,13 @@
   }
 
   async function openMonth() {
-    await ensureRecurringExpenses(monthPicker.value);
+    await ensureRecurringTransactions(monthPicker.value);
     render();
   }
 
   async function initialize() {
     await restoreCsvConnection();
-    await ensureRecurringExpenses(monthPicker.value);
+    await ensureRecurringTransactions(monthPicker.value);
     render();
   }
 
@@ -497,6 +549,7 @@
 
   form.addEventListener("submit", addTransaction);
   recurringForm.addEventListener("submit", addRecurringExpense);
+  recurringIncomeForm.addEventListener("submit", addRecurringIncome);
   document.getElementById("add-income").addEventListener("click", addIncome);
   typeInput.addEventListener("change", updateTransactionForm);
   document.getElementById("download-csv").addEventListener("click", () => {

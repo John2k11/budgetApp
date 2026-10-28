@@ -162,9 +162,45 @@
       <div class="recurring-list" id="recurring-list" aria-live="polite"></div>
     </section>
 
+    <section class="card panel recurring-panel" aria-labelledby="recurring-income-heading">
+      <div class="panel-heading">
+        <div>
+          <h2 id="recurring-income-heading">Regular monthly income</h2>
+          <p class="section-description">Add income you receive each month. It is included automatically from the month you choose.</p>
+        </div>
+      </div>
+      <form id="recurring-income-form">
+        <div class="field">
+          <label for="recurring-income-description">Description</label>
+          <input id="recurring-income-description" name="description" type="text" maxlength="60" placeholder="e.g. Monthly salary" required>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="recurring-income-amount">Amount</label>
+            <input id="recurring-income-amount" name="amount" type="number" min="0.01" max="999999999" step="0.01" placeholder="0.00" required>
+          </div>
+          <div class="field">
+            <label for="recurring-income-category">Category</label>
+            <select id="recurring-income-category" name="category">
+              <option>Salary</option>
+              <option>Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row recurring-form-bottom">
+          <div class="field">
+            <label for="recurring-income-day">Day of the month</label>
+            <input id="recurring-income-day" name="day" type="number" min="1" max="31" step="1" value="1" required>
+          </div>
+          <button class="primary" type="submit">Add monthly income</button>
+        </div>
+      </form>
+      <div class="recurring-list" id="recurring-income-list" aria-live="polite"></div>
+    </section>
+
     <section class="card storage-panel" aria-labelledby="storage-heading">
       <h2 id="storage-heading">Keep a backup</h2>
-      <p class="storage-description">Download or restore a CSV backup, or connect a CSV you previously downloaded from Daybook to save changes directly to it. Your CSV includes transactions, monthly budgets, and recurring outgoings.</p>
+      <p class="storage-description">Download or restore a CSV backup, or connect a CSV you previously downloaded from Daybook to save changes directly to it. Your CSV includes transactions, monthly budgets, recurring income, and recurring outgoings.</p>
       <div class="storage-actions">
         <button class="secondary" id="download-csv" type="button">Download CSV backup</button>
         <button class="secondary" id="import-csv-button" type="button">Import CSV backup</button>

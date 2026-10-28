@@ -24,6 +24,12 @@
           Number.isInteger(item.day) && item.day >= 1 && item.day <= 31 &&
           /^\d{4}-(0[1-9]|1[0-2])$/.test(item.startMonth)
         ) : [],
+        recurringIncomes: Array.isArray(saved.recurringIncomes) ? saved.recurringIncomes.filter(item =>
+          item && typeof item.id === "string" && typeof item.description === "string" &&
+          Number.isFinite(item.amount) && item.amount > 0 && typeof item.category === "string" &&
+          Number.isInteger(item.day) && item.day >= 1 && item.day <= 31 &&
+          /^\d{4}-(0[1-9]|1[0-2])$/.test(item.startMonth)
+        ) : [],
         recurringSkips: Array.isArray(saved.recurringSkips) ? saved.recurringSkips.filter(item =>
           item && typeof item.recurringId === "string" &&
           /^\d{4}-(0[1-9]|1[0-2])$/.test(item.month)
@@ -32,7 +38,7 @@
     } catch (error) {
       console.error("Could not read the saved budget.", error);
       if (onError) onError("Saved data could not be read.");
-      return { transactions: [], budgets: {} };
+      return { transactions: [], budgets: {}, recurringExpenses: [], recurringIncomes: [], recurringSkips: [] };
     }
   }
 
@@ -65,6 +71,10 @@
     for (const recurring of state.recurringExpenses) {
       rows.push(["recurring", recurring.id, recurring.description, recurring.amount,
         "expense", recurring.category, "", recurring.startMonth, "", "", recurring.day, recurring.startMonth]);
+    }
+    for (const recurring of state.recurringIncomes) {
+      rows.push(["recurring_income", recurring.id, recurring.description, recurring.amount,
+        "income", recurring.category, "", recurring.startMonth, "", "", recurring.day, recurring.startMonth]);
     }
     for (const skipped of state.recurringSkips) {
       rows.push(["skip", skipped.recurringId, "", "", "", "", "", skipped.month, "", "", "", ""]);
@@ -127,7 +137,7 @@
     }
 
     const expectedColumns = legacyFormat ? legacyHeaders.length : headers.length;
-    const imported = { transactions: [], budgets: {}, recurringExpenses: [], recurringSkips: [] };
+    const imported = { transactions: [], budgets: {}, recurringExpenses: [], recurringIncomes: [], recurringSkips: [] };
     const ids = new Set();
     const recurringIds = new Set();
     for (const values of rows.slice(1)) {
@@ -160,17 +170,18 @@
           throw new Error("CSV contains an invalid or duplicate monthly budget.");
         }
         imported.budgets[values[7]] = amount;
-      } else if (!legacyFormat && values[0] === "recurring") {
+      } else if (!legacyFormat && (values[0] === "recurring" || values[0] === "recurring_income")) {
         const amount = Number(values[3]);
         const day = Number(values[10]);
+        const isIncome = values[0] === "recurring_income";
         if (!values[1] || recurringIds.has(values[1]) || !values[2].trim() ||
-            !Number.isFinite(amount) || amount <= 0 || values[4] !== "expense" ||
+            !Number.isFinite(amount) || amount <= 0 || values[4] !== (isIncome ? "income" : "expense") ||
             !values[5] || !Number.isInteger(day) || day < 1 || day > 31 ||
             !/^\d{4}-(0[1-9]|1[0-2])$/.test(values[11]) || values[7] !== values[11]) {
-          throw new Error("CSV contains an invalid or duplicate recurring expense.");
+          throw new Error(`CSV contains an invalid or duplicate recurring ${isIncome ? "income" : "expense"}.`);
         }
         recurringIds.add(values[1]);
-        imported.recurringExpenses.push({
+        (isIncome ? imported.recurringIncomes : imported.recurringExpenses).push({
           id: values[1],
           description: values[2],
           amount,
@@ -231,7 +242,7 @@
   async function readCsvHandle(handle) {
     const text = await (await handle.getFile()).text();
     return text.trim() === "" ? {
-      transactions: [], budgets: {}, recurringExpenses: [], recurringSkips: []
+      transactions: [], budgets: {}, recurringExpenses: [], recurringIncomes: [], recurringSkips: []
     } : parseCsv(text);
   }
 
@@ -265,7 +276,9 @@
 
     const state = await readCsvHandle(handle);
     if (!state.transactions.length && !Object.keys(state.budgets).length &&
-        (currentState.transactions.length || Object.keys(currentState.budgets).length)) {
+        !state.recurringExpenses.length && !state.recurringIncomes.length &&
+        (currentState.transactions.length || Object.keys(currentState.budgets).length ||
+          currentState.recurringExpenses.length || currentState.recurringIncomes.length)) {
       csvHandle = handle;
       return { supported: true, connected: false, empty: true, handle };
     }
