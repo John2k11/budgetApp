@@ -190,6 +190,10 @@ h1 { margin: 0; font-size: clamp(27px, 4vw, 36px); letter-spacing: -1.3px; line-
 .intro { margin: 8px 0 25px; color: var(--muted); }
 
 .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.weekly-guidance { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 16px; padding: 18px 22px; }
+.weekly-guidance h2 { font-size: 15px; }
+.weekly-guidance-amount { flex: 0 0 auto; color: var(--green); font-size: clamp(24px, 3vw, 30px); font-weight: 730; letter-spacing: -.7px; }
+.weekly-guidance-amount.expense { color: var(--red); }
 .chart-panel { margin-top: 18px; }
 .chart-heading { flex-wrap: wrap; }
 .chart-legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 12px; }
@@ -310,14 +314,18 @@ footer { margin-top: 26px; color: var(--footer); text-align: center; font-size: 
 @media (max-width: 720px) {
   .page { width: min(100% - 28px, 520px); padding-top: 24px; }
   .topbar { flex-wrap: wrap; align-items: center; gap: 16px; margin-bottom: 28px; }
-  .topbar-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+  .topbar-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 14px 12px; }
   .month-control { display: grid; gap: 4px; justify-items: start; font-size: 12px; }
+  .month-control, .palette-control { width: 100%; min-width: 0; }
   .palette-control { display: grid; gap: 4px; justify-items: start; font-size: 12px; }
-  .month-control input { width: 137px; }
-  .payday-control input { width: 68px; }
+  .month-control input, .palette-control select { width: 100%; min-width: 0; }
+  .payday-control input { width: 100%; }
+  .topbar-actions .theme-toggle { width: 100%; min-height: 44px; align-self: end; }
   .summary { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .stat { min-height: 0; padding: 17px 19px; }
   .stat-value { margin-top: 7px; font-size: 26px; }
+  .weekly-guidance { align-items: flex-start; margin-top: 12px; padding: 17px 19px; }
+  .weekly-guidance-amount { font-size: 24px; }
   .content { gap: 14px; margin-top: 14px; }
   .panel { padding: 19px; }
   input, select { min-height: 44px; }
@@ -333,9 +341,7 @@ footer { margin-top: 26px; color: var(--footer); text-align: center; font-size: 
   .brand { font-size: 16px; }
   .brand-mark { width: 32px; height: 32px; }
   .form-row { grid-template-columns: 1fr; }
-  .topbar-actions .month-control:first-child { min-width: 0; }
-  .topbar-actions .month-control:first-child input { width: 100%; }
-  .topbar-actions .theme-toggle { justify-self: end; }
+  .topbar-actions { column-gap: 10px; }
   .transaction {
     display: grid;
     grid-template-columns: 40px minmax(0, 1fr) auto;

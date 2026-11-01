@@ -143,6 +143,39 @@
     });
   }
 
+  function renderWeeklySpendingSuggestion(balance, startDate, endDate) {
+    const suggestion = document.getElementById("weekly-spending-suggestion");
+    const note = document.getElementById("weekly-guidance-note");
+    suggestion.classList.remove("expense");
+    const remainingStartDate = localDate < startDate ? startDate : localDate;
+    if (endDate < remainingStartDate) {
+      suggestion.textContent = "—";
+      note.textContent = "This budget cycle has ended.";
+      return;
+    }
+
+    const firstDay = new Date(`${remainingStartDate}T00:00:00Z`);
+    const lastDay = new Date(`${endDate}T00:00:00Z`);
+    const remainingDays = Math.floor((lastDay - firstDay) / 86400000) + 1;
+    const remainingWeeks = Math.ceil(remainingDays / 7);
+    if (balance < 0) {
+      suggestion.textContent = formatter.format(balance);
+      suggestion.classList.add("expense");
+      note.textContent = `You are over your available balance. There is no suggested spending allowance for this cycle.`;
+      return;
+    }
+    suggestion.classList.remove("expense");
+    if (balance === 0) {
+      suggestion.textContent = formatter.format(0);
+      note.textContent = `No money is left to spend across the ${remainingWeeks} week${remainingWeeks === 1 ? "" : "s"} remaining in this cycle.`;
+      return;
+    }
+
+    const weeklyAmount = Math.floor((balance / remainingWeeks) * 100) / 100;
+    suggestion.textContent = formatter.format(weeklyAmount);
+    note.textContent = `Per week for the ${remainingWeeks} week${remainingWeeks === 1 ? "" : "s"} remaining in this cycle, based on your left-to-spend balance.`;
+  }
+
   function syncCycleControls() {
     paydayInput.value = String(state.paydayDay);
     monthPicker.value = cycleMonthForDate(localDate);
@@ -480,6 +513,7 @@
     document.getElementById("balance-total").classList.toggle("income", balance >= 0);
     document.getElementById("balance-total").classList.toggle("expense", balance < 0);
     document.getElementById("cycle-range").textContent = `${formatDate(startDate)}–${formatDate(endDate)}`;
+    renderWeeklySpendingSuggestion(balance, startDate, endDate);
     document.getElementById("transaction-count").textContent =
       `${transactions.length} transaction${transactions.length === 1 ? "" : "s"}`;
     renderTransactions(transactions);

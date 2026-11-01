@@ -6,6 +6,7 @@ BudgetGo is a lightweight, browser-based budgeting app for tracking income and e
 
 - Configure a monthly payday and view transactions within pay-cycle date ranges.
 - Add income and expenses, and set budgets for each cycle.
+- Get a suggested weekly spending amount by dividing the available balance by the weeks remaining in the selected cycle. A partial week counts as one week.
 - Track recurring monthly income and outgoings. Generated transactions are created once per occurrence; editing a recurring outgoing changes future occurrences without rewriting transactions already created.
 - Review cumulative income and expense trends against the cycle budget.
 - Browse long transaction and recurring-outgoing lists with desktop pagination or mobile “Load more” controls.
@@ -39,6 +40,8 @@ There is no package manager, build step, or server requirement. Open `index.html
 BudgetGo saves transactions, cycle budgets, payday settings, recurring income/outgoings, and skipped recurring occurrences in browser storage. The existing storage key is `daybook-budget-v1`. Appearance preferences are saved separately in browser storage and synchronized between open BudgetGo tabs. When loading an older CSV backup without a payday setting, BudgetGo retains the payday saved in the browser.
 
 The selected cycle-ending month identifies a pay cycle. A cycle starts on the configured payday in the prior month and ends the day before the payday in the selected month. Paydays that fall beyond a shorter month are clamped to that month’s last day. Transactions are grouped according to their date within these cycle bounds.
+
+The weekly spending suggestion uses the current left-to-spend balance and the days remaining through the cycle end, including today. It rounds the number of remaining weeks up, so a partial week counts as a full week. If the cycle has ended, it displays no suggestion; if the available balance is zero or negative, it explains that no spending allowance remains.
 
 CSV backups include the app’s transactions, budgets, payday setting, recurring items, and skipped occurrences. Import accepts supported older BudgetGo CSV formats for backward compatibility.
 
