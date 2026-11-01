@@ -257,11 +257,11 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.35px; }
 .empty { padding: 32px 12px; color: var(--muted); text-align: center; font-size: 14px; }
 
 form { display: grid; gap: 13px; }
-.field { display: grid; gap: 6px; }
+.field { display: grid; gap: 6px; min-width: 0; }
 label { color: var(--label); font-size: 12px; font-weight: 650; }
 input, select { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; outline: none; background: var(--field); color: var(--ink); }
 input:focus, select:focus { border-color: var(--accent-border); box-shadow: 0 0 0 3px var(--accent-focus); }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+.form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
 .primary { min-height: 44px; margin-top: 3px; border: 0; border-radius: 10px; background: var(--green-solid); color: white; font-weight: 700; transition: background .15s, transform .15s; }
 .primary:hover { transform: translateY(-1px); background: #275e42; }
 .budget-box { margin-top: 20px; padding: 17px; border-radius: 13px; background: var(--green-light); }
@@ -340,7 +340,6 @@ footer { margin-top: 26px; color: var(--footer); text-align: center; font-size: 
 @media (max-width: 380px) {
   .brand { font-size: 16px; }
   .brand-mark { width: 32px; height: 32px; }
-  .form-row { grid-template-columns: 1fr; }
   .topbar-actions { column-gap: 10px; }
   .transaction {
     display: grid;
@@ -360,4 +359,8 @@ footer { margin-top: 26px; color: var(--footer); text-align: center; font-size: 
   .panel-heading .count { width: 100%; margin-left: 0; }
   .panel, .storage-panel { padding: 17px; }
   .recurring-form-bottom .primary { width: 100%; }
+}
+
+@media (max-width: 460px) {
+  .form-row { grid-template-columns: minmax(0, 1fr); }
 }
