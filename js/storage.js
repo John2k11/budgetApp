@@ -226,6 +226,7 @@
         throw new Error("CSV contains an unknown record type.");
       }
     }
+    imported.hasPaydaySetting = hasPaydaySetting;
     return imported;
   }
 

@@ -106,6 +106,12 @@
     toastTimer = setTimeout(() => toast.classList.remove("show"), 2600);
   }
 
+  function preservePaydayWhenCsvHasNoSetting(csvState) {
+    if (csvState.hasPaydaySetting === false) csvState.paydayDay = state.paydayDay;
+    delete csvState.hasPaydaySetting;
+    return csvState;
+  }
+
   function addMonths(month, amount) {
     const [year, monthNumber] = month.split("-").map(Number);
     const date = new Date(year, monthNumber - 1 + amount, 1);
@@ -816,7 +822,7 @@
       const candidate = await storage.chooseCsvFile();
       if (!confirmDataReplacement(candidate.state)) return;
       await storage.activateCsv(candidate.handle);
-      state = candidate.state;
+      state = preservePaydayWhenCsvHasNoSetting(candidate.state);
       storage.saveLocalCopy(state);
       syncCycleControls();
       resetTransactionView();
@@ -835,7 +841,7 @@
     try {
       const candidate = await storage.reconnectCsv();
       if (!confirmDataReplacement(candidate.state)) return;
-      state = candidate.state;
+      state = preservePaydayWhenCsvHasNoSetting(candidate.state);
       storage.saveLocalCopy(state);
       syncCycleControls();
       resetTransactionView();
@@ -860,7 +866,7 @@
       } else if (result.empty) {
         updateCsvConnectionStatus(`The linked CSV (${result.handle.name}) is empty. Your browser copy was kept; reconnect to confirm before replacing it.`, true);
       } else if (result.connected) {
-        state = result.state;
+        state = preservePaydayWhenCsvHasNoSetting(result.state);
         storage.saveLocalCopy(state);
         syncCycleControls();
         resetTransactionView();
@@ -924,7 +930,7 @@
       const imported = storage.parseCsv(await file.text());
       if (!confirmDataReplacement(imported)) return;
       const previous = state;
-      state = imported;
+      state = preservePaydayWhenCsvHasNoSetting(imported);
       if (!(await saveCurrentState())) {
         state = previous;
         return;
@@ -1012,6 +1018,28 @@
   });
   themeToggle.addEventListener("click", toggleTheme);
   palettePicker.addEventListener("change", changePalette);
+  window.addEventListener("storage", event => {
+    if (event.key === "daybook-theme") {
+      applyTheme(event.newValue === "dark" ? "dark" : "light", document.documentElement.dataset.palette);
+    } else if (event.key === "budgetgo-palette") {
+      const palette = ["blue", "green", "purple"].includes(event.newValue) ? event.newValue : "blue";
+      applyTheme(document.documentElement.dataset.theme, palette);
+    } else if (event.key === "daybook-budget-v1" && event.newValue) {
+      try {
+        const saved = JSON.parse(event.newValue);
+        if (Number.isInteger(saved.paydayDay) && saved.paydayDay >= 1 && saved.paydayDay <= 31 &&
+            saved.paydayDay !== state.paydayDay) {
+          state.paydayDay = saved.paydayDay;
+          syncCycleControls();
+          resetTransactionView();
+          render();
+        }
+      } catch (error) {
+        console.error("Could not sync the saved payday setting.", error);
+        showToast("Could not sync the payday setting from another tab.");
+      }
+    }
+  });
 
   try {
     const theme = localStorage.getItem("daybook-theme") === "dark" ? "dark" : "light";

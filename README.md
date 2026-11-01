@@ -36,7 +36,7 @@ There is no package manager, build step, or server requirement. Open `index.html
 
 ## Data and pay-cycle behavior
 
-BudgetGo saves transactions, cycle budgets, payday settings, recurring income/outgoings, and skipped recurring occurrences in browser storage. The existing storage key is `daybook-budget-v1`. Appearance preferences are stored separately.
+BudgetGo saves transactions, cycle budgets, payday settings, recurring income/outgoings, and skipped recurring occurrences in browser storage. The existing storage key is `daybook-budget-v1`. Appearance preferences are saved separately in browser storage and synchronized between open BudgetGo tabs. When loading an older CSV backup without a payday setting, BudgetGo retains the payday saved in the browser.
 
 The selected cycle-ending month identifies a pay cycle. A cycle starts on the configured payday in the prior month and ends the day before the payday in the selected month. Paydays that fall beyond a shorter month are clamped to that month’s last day. Transactions are grouped according to their date within these cycle bounds.
 
