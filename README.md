@@ -5,7 +5,7 @@ BudgetGo is a lightweight, browser-based budgeting app for tracking income and e
 ## Features
 
 - Configure a monthly payday and view transactions within pay-cycle date ranges.
-- Add income and expenses, and set budgets for each cycle.
+- Add income, expenses, and savings transactions, and set budgets for each cycle. Savings transactions count as expenses in balances, budget tracking, and the trend chart.
 - Get a suggested weekly spending amount by dividing the available balance by the weeks remaining in the selected cycle. A partial week counts as one week.
 - Track recurring monthly income and outgoings. Generated transactions are created once per occurrence; editing a recurring outgoing changes future occurrences without rewriting transactions already created.
 - Review cumulative income and expense trends against the cycle budget.

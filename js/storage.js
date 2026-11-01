@@ -29,7 +29,7 @@
         transactions: Array.isArray(saved.transactions) ? saved.transactions.filter(item =>
           item && typeof item.id === "string" && typeof item.description === "string" &&
           Number.isFinite(item.amount) && item.amount > 0 &&
-          (item.type === "income" || item.type === "expense") &&
+          (item.type === "income" || item.type === "expense" || item.type === "savings") &&
           typeof item.category === "string" && /^\d{4}-\d{2}-\d{2}$/.test(item.date)
         ) : [],
         budgets: saved.budgets && typeof saved.budgets === "object" && !Array.isArray(saved.budgets)
@@ -163,7 +163,7 @@
         const transactionDate = new Date(`${values[6]}T00:00:00Z`);
         if (!values[1] || ids.has(values[1]) || !values[2].trim() ||
             !Number.isFinite(amount) || amount <= 0 ||
-            (values[4] !== "income" && values[4] !== "expense") ||
+            !["income", "expense", "savings"].includes(values[4]) ||
             !values[5] || !/^\d{4}-\d{2}-\d{2}$/.test(values[6]) ||
             !Number.isFinite(transactionDate.getTime()) || transactionDate.toISOString().slice(0, 10) !== values[6]) {
           throw new Error("CSV contains an invalid or duplicate transaction.");

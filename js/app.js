@@ -1,7 +1,7 @@
 (() => {
   const storage = window.DaybookStorage;
   const icons = {
-    Food: "🥑", Transport: "🚲", Housing: "🏠", Utilities: "💡",
+    Food: "🥑", Transport: "🚲", Housing: "🏠", Utilities: "💡", Savings: "🏦",
     Health: "🌿", Shopping: "🛍️", Entertainment: "🎟️", Salary: "💼", Other: "✦"
   };
   const monthPicker = document.getElementById("month-picker");
@@ -183,10 +183,13 @@
 
   function updateTransactionForm() {
     const type = typeInput.value;
-    const label = type === "income" ? "income" : "expense";
+    const label = type === "income" ? "income" : type === "savings" ? "savings" : "expense";
     document.getElementById("transaction-heading").textContent = `Add ${label}`;
     document.getElementById("transaction-submit").textContent = `Add ${label}`;
-    descriptionInput.placeholder = type === "income" ? "e.g. Monthly salary" : "e.g. Weekly groceries";
+    descriptionInput.placeholder = type === "income"
+      ? "e.g. Monthly salary"
+      : type === "savings" ? "e.g. Emergency fund" : "e.g. Weekly groceries";
+    if (type === "savings") document.getElementById("category").value = "Savings";
   }
 
   function resetTransactionView() {
@@ -243,7 +246,7 @@
       info.append(description, meta);
 
       const amount = document.createElement("span");
-      amount.className = `transaction-amount ${item.type}`;
+      amount.className = `transaction-amount ${item.type === "income" ? "income" : "expense"}`;
       amount.textContent = `${item.type === "income" ? "+" : "−"}${formatter.format(item.amount)}`;
       const remove = document.createElement("button");
       remove.className = "delete-button";
@@ -286,10 +289,7 @@
     const dailyIncome = new Map();
     const dailyExpenses = new Map();
     for (const transaction of transactions) {
-      const dailySeries = transaction.type === "income"
-        ? dailyIncome
-        : transaction.type === "expense" ? dailyExpenses : null;
-      if (!dailySeries) continue;
+      const dailySeries = transaction.type === "income" ? dailyIncome : dailyExpenses;
       dailySeries.set(transaction.date, (dailySeries.get(transaction.date) || 0) + transaction.amount);
     }
 
@@ -501,7 +501,7 @@
       .filter(item => item.date >= startDate && item.date <= endDate)
       .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
     const income = transactions.reduce((sum, item) => sum + (item.type === "income" ? item.amount : 0), 0);
-    const expenses = transactions.reduce((sum, item) => sum + (item.type === "expense" ? item.amount : 0), 0);
+    const expenses = transactions.reduce((sum, item) => sum + (item.type !== "income" ? item.amount : 0), 0);
     const balance = state.transactions
       .filter(item => item.date <= endDate)
       .reduce((sum, item) => sum + (item.type === "income" ? item.amount : -item.amount), 0);
