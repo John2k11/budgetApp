@@ -6,6 +6,22 @@
 
   let csvHandle = null;
 
+  function isValidDate(value) {
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(`${value}T00:00:00Z`);
+    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }
+
+  function loadRecurringItems(items) {
+    return Array.isArray(items) ? items.filter(item =>
+      item && typeof item.id === "string" && typeof item.description === "string" &&
+      Number.isFinite(item.amount) && item.amount > 0 && typeof item.category === "string" &&
+      Number.isInteger(item.day) && item.day >= 1 && item.day <= 31 &&
+      /^\d{4}-(0[1-9]|1[0-2])$/.test(item.startMonth) &&
+      (item.startDate === undefined || isValidDate(item.startDate))
+    ).map(item => ({ ...item, startDate: item.startDate || `${item.startMonth}-01` })) : [];
+  }
+
   function loadState(onError) {
     try {
       const saved = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "{}");
@@ -18,18 +34,10 @@
         ) : [],
         budgets: saved.budgets && typeof saved.budgets === "object" && !Array.isArray(saved.budgets)
           ? saved.budgets : {},
-        recurringExpenses: Array.isArray(saved.recurringExpenses) ? saved.recurringExpenses.filter(item =>
-          item && typeof item.id === "string" && typeof item.description === "string" &&
-          Number.isFinite(item.amount) && item.amount > 0 && typeof item.category === "string" &&
-          Number.isInteger(item.day) && item.day >= 1 && item.day <= 31 &&
-          /^\d{4}-(0[1-9]|1[0-2])$/.test(item.startMonth)
-        ) : [],
-        recurringIncomes: Array.isArray(saved.recurringIncomes) ? saved.recurringIncomes.filter(item =>
-          item && typeof item.id === "string" && typeof item.description === "string" &&
-          Number.isFinite(item.amount) && item.amount > 0 && typeof item.category === "string" &&
-          Number.isInteger(item.day) && item.day >= 1 && item.day <= 31 &&
-          /^\d{4}-(0[1-9]|1[0-2])$/.test(item.startMonth)
-        ) : [],
+        paydayDay: Number.isInteger(saved.paydayDay) && saved.paydayDay >= 1 && saved.paydayDay <= 31
+          ? saved.paydayDay : 1,
+        recurringExpenses: loadRecurringItems(saved.recurringExpenses),
+        recurringIncomes: loadRecurringItems(saved.recurringIncomes),
         recurringSkips: Array.isArray(saved.recurringSkips) ? saved.recurringSkips.filter(item =>
           item && typeof item.recurringId === "string" &&
           /^\d{4}-(0[1-9]|1[0-2])$/.test(item.month)
@@ -38,7 +46,7 @@
     } catch (error) {
       console.error("Could not read the saved budget.", error);
       if (onError) onError("Saved data could not be read.");
-      return { transactions: [], budgets: {}, recurringExpenses: [], recurringIncomes: [], recurringSkips: [] };
+      return { transactions: [], budgets: {}, paydayDay: 1, recurringExpenses: [], recurringIncomes: [], recurringSkips: [] };
     }
   }
 
@@ -59,25 +67,28 @@
 
   function serializeState(state) {
     const rows = [["record", "id", "description", "amount", "type", "category", "date", "month", "budget",
-      "recurring_id", "recurring_day", "start_month"]];
+      "recurring_id", "recurring_day", "start_month", "start_date"]];
     for (const transaction of state.transactions) {
       rows.push(["transaction", transaction.id, transaction.description, transaction.amount,
         transaction.type, transaction.category, transaction.date, "", "",
-        transaction.recurringId || "", "", ""]);
+        transaction.recurringId || "", "", "", ""]);
     }
     for (const [month, amount] of Object.entries(state.budgets)) {
-      rows.push(["budget", "", "", "", "", "", "", month, amount, "", "", ""]);
+      rows.push(["budget", "", "", "", "", "", "", month, amount, "", "", "", ""]);
     }
+    rows.push(["setting", "", "paydayDay", state.paydayDay, "", "", "", "", "", "", "", "", ""]);
     for (const recurring of state.recurringExpenses) {
       rows.push(["recurring", recurring.id, recurring.description, recurring.amount,
-        "expense", recurring.category, "", recurring.startMonth, "", "", recurring.day, recurring.startMonth]);
+        "expense", recurring.category, "", recurring.startMonth, "", "", recurring.day, recurring.startMonth,
+        recurring.startDate || `${recurring.startMonth}-01`]);
     }
     for (const recurring of state.recurringIncomes) {
       rows.push(["recurring_income", recurring.id, recurring.description, recurring.amount,
-        "income", recurring.category, "", recurring.startMonth, "", "", recurring.day, recurring.startMonth]);
+        "income", recurring.category, "", recurring.startMonth, "", "", recurring.day, recurring.startMonth,
+        recurring.startDate || `${recurring.startMonth}-01`]);
     }
     for (const skipped of state.recurringSkips) {
-      rows.push(["skip", skipped.recurringId, "", "", "", "", "", skipped.month, "", "", "", ""]);
+      rows.push(["skip", skipped.recurringId, "", "", "", "", "", skipped.month, "", "", "", "", ""]);
     }
     return `${rows.map(row => row.map(escapeCsv).join(",")).join("\r\n")}\r\n`;
   }
@@ -128,18 +139,23 @@
     }
 
     const legacyHeaders = ["record", "id", "description", "amount", "type", "category", "date", "month", "budget"];
-    const headers = [...legacyHeaders, "recurring_id", "recurring_day", "start_month"];
+    const previousHeaders = [...legacyHeaders, "recurring_id", "recurring_day", "start_month"];
+    const headers = [...previousHeaders, "start_date"];
     const legacyFormat = rows.length > 0 && rows[0].length === legacyHeaders.length &&
       legacyHeaders.every((header, index) => rows[0][index] === header);
-    if (!legacyFormat && (!rows.length || rows[0].length !== headers.length ||
-        headers.some((header, index) => rows[0][index] !== header))) {
-      throw new Error("This is not a Daybook CSV. Use a CSV backup exported from Daybook.");
+    const previousFormat = rows.length > 0 && rows[0].length === previousHeaders.length &&
+      previousHeaders.every((header, index) => rows[0][index] === header);
+    const currentFormat = rows.length > 0 && rows[0].length === headers.length &&
+      headers.every((header, index) => rows[0][index] === header);
+    if (!legacyFormat && !previousFormat && !currentFormat) {
+      throw new Error("This is not a BudgetGo CSV. Use a CSV backup exported from BudgetGo.");
     }
 
-    const expectedColumns = legacyFormat ? legacyHeaders.length : headers.length;
-    const imported = { transactions: [], budgets: {}, recurringExpenses: [], recurringIncomes: [], recurringSkips: [] };
+    const expectedColumns = legacyFormat ? legacyHeaders.length : previousFormat ? previousHeaders.length : headers.length;
+    const imported = { transactions: [], budgets: {}, paydayDay: 1, recurringExpenses: [], recurringIncomes: [], recurringSkips: [] };
     const ids = new Set();
     const recurringIds = new Set();
+    let hasPaydaySetting = false;
     for (const values of rows.slice(1)) {
       if (values.length !== expectedColumns) throw new Error("CSV row has the wrong number of columns.");
       if (values[0] === "transaction") {
@@ -167,17 +183,27 @@
         const amount = Number(values[8]);
         if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(values[7]) || !Number.isFinite(amount) || amount <= 0 ||
             Object.prototype.hasOwnProperty.call(imported.budgets, values[7])) {
-          throw new Error("CSV contains an invalid or duplicate monthly budget.");
+          throw new Error("CSV contains an invalid or duplicate cycle budget.");
         }
         imported.budgets[values[7]] = amount;
+      } else if (!legacyFormat && values[0] === "setting") {
+        const paydayDay = Number(values[3]);
+        if (values[2] !== "paydayDay" || hasPaydaySetting ||
+            !Number.isInteger(paydayDay) || paydayDay < 1 || paydayDay > 31) {
+          throw new Error("CSV contains an invalid or duplicate payday setting.");
+        }
+        imported.paydayDay = paydayDay;
+        hasPaydaySetting = true;
       } else if (!legacyFormat && (values[0] === "recurring" || values[0] === "recurring_income")) {
         const amount = Number(values[3]);
         const day = Number(values[10]);
         const isIncome = values[0] === "recurring_income";
+        const startDate = currentFormat ? values[12] : `${values[11]}-01`;
         if (!values[1] || recurringIds.has(values[1]) || !values[2].trim() ||
             !Number.isFinite(amount) || amount <= 0 || values[4] !== (isIncome ? "income" : "expense") ||
             !values[5] || !Number.isInteger(day) || day < 1 || day > 31 ||
-            !/^\d{4}-(0[1-9]|1[0-2])$/.test(values[11]) || values[7] !== values[11]) {
+            !/^\d{4}-(0[1-9]|1[0-2])$/.test(values[11]) || values[7] !== values[11] ||
+            !isValidDate(startDate) || startDate.slice(0, 7) !== values[11]) {
           throw new Error(`CSV contains an invalid or duplicate recurring ${isIncome ? "income" : "expense"}.`);
         }
         recurringIds.add(values[1]);
@@ -187,7 +213,8 @@
           amount,
           category: values[5],
           day,
-          startMonth: values[11]
+          startMonth: values[11],
+          startDate
         });
       } else if (!legacyFormat && values[0] === "skip") {
         if (!values[1] || !/^\d{4}-(0[1-9]|1[0-2])$/.test(values[7]) ||
@@ -242,14 +269,14 @@
   async function readCsvHandle(handle) {
     const text = await (await handle.getFile()).text();
     return text.trim() === "" ? {
-      transactions: [], budgets: {}, recurringExpenses: [], recurringIncomes: [], recurringSkips: []
+      transactions: [], budgets: {}, paydayDay: 1, recurringExpenses: [], recurringIncomes: [], recurringSkips: []
     } : parseCsv(text);
   }
 
   async function chooseCsvFile() {
     const [handle] = await window.showOpenFilePicker({
       multiple: false,
-      types: [{ description: "Daybook CSV backup", accept: { "text/csv": [".csv"] } }]
+      types: [{ description: "BudgetGo CSV backup", accept: { "text/csv": [".csv"] } }]
     });
     const permission = await handle.requestPermission({ mode: "readwrite" });
     if (permission !== "granted") throw new Error("Permission to use the CSV was not granted.");
@@ -331,7 +358,7 @@
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `daybook-backup-${date}.csv`;
+    link.download = `budgetgo-backup-${date}.csv`;
     document.body.append(link);
     link.click();
     link.remove();
